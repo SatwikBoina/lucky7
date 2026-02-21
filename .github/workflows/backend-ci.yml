@@ -1,0 +1,108 @@
+name: Test & Deploy Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Run game logic tests
+        run: |
+          cd backend
+          python -c "
+          from app import create_deck, deal_cards, find_starter, get_valid_moves, check_winner
+
+          # Test deck creation
+          deck = create_deck()
+          assert len(deck) == 52, 'Deck should have 52 cards'
+          print('✅ Deck creation: OK')
+
+          # Test dealing
+          players = ['p1','p2','p3','p4']
+          hands = deal_cards(players, deck)
+          assert all(len(h) == 13 for h in hands.values()), 'Each player should get 13 cards'
+          print('✅ Card dealing: OK')
+
+          # Test find_starter
+          starter = find_starter(hands)
+          assert starter in players, 'Starter should be one of the players'
+          print('✅ Find starter: OK')
+
+          # Test valid moves — diamond 7 is on board
+          board = {'diamonds': [7], 'hearts': [], 'clubs': [], 'spades': []}
+          hand = [{'suit':'diamonds','rank':6}, {'suit':'diamonds','rank':8}, {'suit':'hearts','rank':7}]
+          valid = get_valid_moves(hand, board)
+          assert len(valid) == 3, f'Should have 3 valid moves, got {len(valid)}'
+          print('✅ Valid moves: OK')
+
+          # Test no valid moves
+          board2 = {'diamonds': [7], 'hearts': [], 'clubs': [], 'spades': []}
+          hand2 = [{'suit':'hearts','rank':3}, {'suit':'clubs','rank':9}]
+          valid2 = get_valid_moves(hand2, board2)
+          assert len(valid2) == 0, 'Should have no valid moves'
+          print('✅ No valid moves: OK')
+
+          # Test winner
+          hands_check = {'p1': [], 'p2': [{'suit':'hearts','rank':5}]}
+          winner = check_winner(hands_check)
+          assert winner == 'p1', 'p1 should win with empty hand'
+          print('✅ Winner detection: OK')
+
+          print('')
+          print('All tests passed! 🎉')
+          "
+
+  # ============================================================
+  # DEPLOY (choose ONE platform, uncomment the relevant section)
+  # ============================================================
+
+  # ---- Option A: Deploy to Render (recommended free tier) ----
+  # Uncomment this block and add RENDER_DEPLOY_HOOK secret in repo settings
+  # deploy-render:
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Trigger Render deploy
+  #       run: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
+
+  # ---- Option B: Deploy to Railway ----
+  # Uncomment and add RAILWAY_TOKEN secret
+  # deploy-railway:
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Deploy to Railway
+  #       uses: bervProject/railway-deploy@main
+  #       with:
+  #         railway_token: ${{ secrets.RAILWAY_TOKEN }}
+  #         service: lucky7-backend
+
+  # ---- Option C: Deploy to Fly.io ----
+  # Uncomment and add FLY_API_TOKEN secret
+  # deploy-fly:
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: superfly/flyctl-actions/setup-flyctl@master
+  #     - run: flyctl deploy --remote-only
+  #       env:
+  #         FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
