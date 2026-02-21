@@ -443,6 +443,54 @@
     min-height: 1.2rem;
   }
 
+  .btn-exit {
+    background: transparent;
+    border: 1px solid rgba(231,76,60,0.4);
+    color: rgba(231,76,60,0.8);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    padding: 0.4rem 0.9rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-exit:hover { background: rgba(231,76,60,0.15); border-color: #e74c3c; color: #e74c3c; }
+
+  /* Exit confirm modal */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: none; align-items: center; justify-content: center;
+    z-index: 300;
+    backdrop-filter: blur(6px);
+  }
+  .modal-overlay.show { display: flex; }
+  .modal-box {
+    background: #0f2d1a;
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: 16px;
+    padding: 2rem;
+    max-width: 320px;
+    width: 90%;
+    text-align: center;
+  }
+  .modal-box h3 {
+    font-family: 'Playfair Display', serif;
+    color: var(--gold);
+    font-size: 1.3rem;
+    margin-bottom: 0.75rem;
+  }
+  .modal-box p {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    color: rgba(250,246,238,0.6);
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+  }
+  .modal-actions { display: flex; gap: 0.75rem; }
+  .modal-actions button { flex: 1; }
+
   @media (max-width: 480px) {
     :root { --card-w: 56px; --card-h: 84px; }
     .board-card { width: 28px; height: 42px; font-size: 0.6rem; }
@@ -494,6 +542,9 @@
   <button class="btn btn-primary" id="start-btn" style="max-width:280px;margin-top:1rem" onclick="startGame()" disabled>
     Waiting for players...
   </button>
+  <button class="btn btn-secondary" style="max-width:280px;margin-top:0.5rem;border-color:rgba(231,76,60,0.3);color:rgba(231,76,60,0.7)" onclick="confirmExit()">
+    Leave Game
+  </button>
   <div class="error-msg" id="waiting-error"></div>
   <p class="pulse" style="margin-top:1rem;font-family:'DM Mono',monospace;font-size:0.7rem;color:rgba(250,246,238,0.3)">
     ◉ LIVE — refreshing automatically
@@ -504,7 +555,10 @@
 <div id="game-screen" class="screen">
   <div class="top-bar">
     <div class="game-title">♦ Lucky 7</div>
-    <div class="turn-indicator" id="turn-indicator">Loading...</div>
+    <div style="display:flex;align-items:center;gap:0.75rem">
+      <div class="turn-indicator" id="turn-indicator">Loading...</div>
+      <button class="btn-exit" onclick="confirmExit()">✕ Leave</button>
+    </div>
   </div>
 
   <div class="opponents-row" id="opponents-row"></div>
@@ -545,6 +599,18 @@
   <div class="winner-text" id="winner-text">Winner!</div>
   <p style="font-family:'DM Mono',monospace;color:rgba(250,246,238,0.6);margin-top:1rem;font-size:0.9rem" id="winner-sub"></p>
   <button class="btn btn-primary" style="margin-top:2rem;max-width:200px" onclick="location.reload()">Play Again</button>
+</div>
+
+<!-- EXIT CONFIRM MODAL -->
+<div class="modal-overlay" id="exit-modal">
+  <div class="modal-box">
+    <h3>Leave Game?</h3>
+    <p id="exit-modal-msg">Are you sure you want to leave? Your cards will remain in the game.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeExitModal()">Stay</button>
+      <button class="btn btn-primary" style="background:linear-gradient(135deg,#c0392b,#e74c3c);color:white" onclick="exitGame()">Leave</button>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -822,7 +888,43 @@ function showWinner(data) {
   clearInterval(state.polling);
 }
 
-function showError(id, msg) {
+function confirmExit() {
+  const inGame = lastStatus === 'playing';
+  const msg = inGame
+    ? 'Are you sure you want to leave mid-game? Your cards will remain and other players will continue.'
+    : 'Are you sure you want to leave the lobby?';
+  document.getElementById('exit-modal-msg').textContent = msg;
+  document.getElementById('exit-modal').classList.add('show');
+}
+
+function closeExitModal() {
+  document.getElementById('exit-modal').classList.remove('show');
+}
+
+function exitGame() {
+  clearInterval(state.polling);
+  sessionStorage.removeItem('lucky7_game');
+  state = { gameId: null, playerId: null, isHost: false, polling: null };
+  lastStatus = null;
+
+  // Hide all screens, show lobby
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('winner-screen').classList.remove('show');
+  document.getElementById('exit-modal').classList.remove('show');
+  document.getElementById('lobby-screen').classList.add('active');
+
+  // Clear inputs
+  document.getElementById('player-name').value = '';
+  document.getElementById('join-code').value = '';
+  document.getElementById('lobby-error').textContent = '';
+}
+
+// Close modal on backdrop click
+document.getElementById('exit-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeExitModal();
+});
+
+
   document.getElementById(id).textContent = msg;
   setTimeout(() => document.getElementById(id).textContent = '', 4000);
 }
